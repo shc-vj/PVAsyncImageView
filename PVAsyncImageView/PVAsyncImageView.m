@@ -17,19 +17,19 @@
 
 @implementation PVAsyncImageView
 
-- (void)downloadImageFromURL:(NSString *)url{
+- (void)downloadImageFromURL:(NSURL *)url{
     [self downloadImageFromURL:url withPlaceholderImage:nil errorImage:nil andDisplaySpinningWheel:NO];
 }
 
-- (void)downloadImageFromURL:(NSString *)url withPlaceholderImage:(NSImage *)img{
+- (void)downloadImageFromURL:(NSURL *)url withPlaceholderImage:(PVImage *)img{
     [self downloadImageFromURL:url withPlaceholderImage:img errorImage:nil andDisplaySpinningWheel:NO];
 }
 
-- (void)downloadImageFromURL:(NSString *)url withPlaceholderImage:(NSImage *)img andErrorImage:(NSImage *)errorImg{
+- (void)downloadImageFromURL:(NSURL *)url withPlaceholderImage:(PVImage *)img andErrorImage:(PVImage *)errorImg{
     [self downloadImageFromURL:url withPlaceholderImage:img errorImage:errorImg andDisplaySpinningWheel:NO];
 }
 
-- (void)downloadImageFromURL:(NSString *)url withPlaceholderImage:(NSImage *)img errorImage:(NSImage *)errorImg andDisplaySpinningWheel:(BOOL)usesSpinningWheel{
+- (void)downloadImageFromURL:(NSURL *)url withPlaceholderImage:(PVImage *)img errorImage:(PVImage *)errorImg andDisplaySpinningWheel:(BOOL)usesSpinningWheel{
     [self cancelDownload];
     
     self.isLoadingImage = YES;
@@ -39,34 +39,46 @@
     self.image = img;
     errorImage = errorImg;
     imageDownloadData = [NSMutableData data];
-#if !__has_feature(objc_arc)
-	[ imageDownloadData retain ];
-#endif
-    NSURLConnection *conn = [[NSURLConnection alloc] initWithRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:url]] delegate:self];
+	
+	NSURLConnection *conn = [[NSURLConnection alloc] initWithRequest:[NSURLRequest requestWithURL:url] delegate:self];
     imageURLConnection = conn;
     
     if(usesSpinningWheel){
-        
+		
+#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
+		spinningWheel = [[NSProgressIndicator alloc] init];
+		[spinningWheel setStyle:NSProgressIndicatorSpinningStyle];
+		[spinningWheel setDisplayedWhenStopped:NO];
+
+		[self addSubview:spinningWheel];
+
+		[spinningWheel startAnimation:self];
+
+#else
+		spinningWheel = [[UIProgressIndicaor alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray]
+		[spinningWheel setHidesWhenStopped:YES];
+		
+		[self addSubview:spinningWheel];
+
+		[spinningWheel startAnimating];
+
+#endif
+		
         //If the NSImageView size is 64+ height and 64+ width display Spinning Wheel 32x32
         if (self.frame.size.height >= 64 && self.frame.size.width >= 64){
-            spinningWheel = [[NSProgressIndicator alloc] init];
-            [spinningWheel setStyle:NSProgressIndicatorSpinningStyle];
-            [self addSubview:spinningWheel];
-            [spinningWheel setDisplayedWhenStopped:NO];
+			
             [spinningWheel setFrame: NSMakeRect(self.frame.size.width * 0.5 - 16, self.frame.size.height * 0.5 - 16, 32, 32)];
-            [spinningWheel setControlSize:NSRegularControlSize];
-            [spinningWheel startAnimation:self];
-            
+			[spinningWheel setControlSize:NSRegularControlSize];
+
+			
         //If not, and size between 63 and 16 height and 63 and 16 width display Spinning Wheel 16x16
         }else if((self.frame.size.height < 64 && self.frame.size.height >= 16) && (self.frame.size.width < 64 && self.frame.size.width >= 16)){
-            spinningWheel = [[NSProgressIndicator alloc] init];
-            [spinningWheel setStyle:NSProgressIndicatorSpinningStyle];
-            [self addSubview:spinningWheel];
-            [spinningWheel setDisplayedWhenStopped:NO];
-            [spinningWheel setFrame: NSMakeRect(self.frame.size.width * 0.5 - 8, self.frame.size.height * 0.5 - 8, 16, 16)];
-            [spinningWheel setControlSize:NSSmallControlSize];
-            [spinningWheel startAnimation:self];
-        }
+
+			[spinningWheel setFrame: NSMakeRect(self.frame.size.width * 0.5 - 8, self.frame.size.height * 0.5 - 8, 16, 16)];
+#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
+			[spinningWheel setControlSize:NSSmallControlSize];
+#endif
+		}
     }
 }
 
@@ -75,9 +87,14 @@
     self.isLoadingImage = NO;
     self.didFailLoadingImage = NO;
     
-    [self deleteToolTips];
+#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
+	[self deleteToolTips];
     
     [spinningWheel stopAnimation:self];
+#else
+	[spinningWheel stopAnimating];
+#endif
+	
     [spinningWheel removeFromSuperview];
     
     [imageURLConnection cancel];
@@ -95,9 +112,14 @@
     self.isLoadingImage = NO;
     self.didFailLoadingImage = YES;
     self.userDidCancel = NO;
-    
+
+#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
     [spinningWheel stopAnimation:self];
-    [spinningWheel removeFromSuperview];
+#else
+	[spinningWheel stopAnimating];
+#endif
+	
+	[spinningWheel removeFromSuperview];
     
     imageDownloadData = nil;
     imageURLConnection = nil;
@@ -111,13 +133,17 @@
     self.userDidCancel = NO;
     
     NSData *data = imageDownloadData;
-    NSImage *img = [[NSImage alloc] initWithData:data];
+    PVImage *img = [[PVImage alloc] initWithData:data];
     
     if(img){ //if NSData is from an image
         self.image = img;
         self.isLoadingImage = NO;
-        
+
+#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
         [spinningWheel stopAnimation:self];
+#else
+		[spinningWheel stopAnimating];
+#endif
         [spinningWheel removeFromSuperview];
         imageDownloadData = nil;
         imageURLConnection = nil;
@@ -126,6 +152,8 @@
         [self connection:nil didFailWithError:nil];
     }
 }
+
+#if defined __MAC_OS_X_VERSION_MIN_REQUIRED
 
 -(void)setToolTipWhileLoading:(NSString *)ttip1 whenFinished:(NSString *)ttip2 andWhenFinishedWithError:(NSString *)ttip3{
     self.toolTipWhileLoading = ttip1;
@@ -175,7 +203,10 @@
 }
 
 - (void)updateTrackingAreas{
-    if(trackingArea != nil) {
+	
+	[super updateTrackingAreas];
+	
+	if(trackingArea != nil) {
         [self removeTrackingArea:trackingArea];
     }
     
@@ -186,6 +217,8 @@
                                                 userInfo:nil];
     [self addTrackingArea:trackingArea];
 }
+
+#endif
 
 @end
 

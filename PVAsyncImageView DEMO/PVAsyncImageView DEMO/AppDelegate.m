@@ -15,7 +15,7 @@
 }
 
 - (IBAction)downloadIMG:(id)sender {
-    [_imageView downloadImageFromURL:_imageURL.stringValue withPlaceholderImage:[NSImage imageNamed:@"loading"] errorImage:[NSImage imageNamed:@"error"] andDisplaySpinningWheel:YES];
+    [_imageView downloadImageFromURL:[NSURL URLWithString:_imageURL.stringValue] withPlaceholderImage:[NSImage imageNamed:@"loading"] errorImage:[NSImage imageNamed:@"error"] andDisplaySpinningWheel:YES];
     /*You can also download images by:
             [_imageView downloadImageFromURL:_imageURL.stringValue]; 
                     --> Simply download the image
