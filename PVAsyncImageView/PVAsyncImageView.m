@@ -9,9 +9,12 @@
 #import "PVAsyncImageView.h"
 
 @interface PVAsyncImageView ()
-    @property (readwrite) BOOL isLoadingImage;
-    @property (readwrite) BOOL userDidCancel;
-    @property (readwrite) BOOL didFailLoadingImage;
+
+@property (readwrite) NSURL *url;
+@property (readwrite) BOOL  isLoadingImage;
+@property (readwrite) BOOL  userDidCancel;
+@property (readwrite) BOOL  didFailLoadingImage;
+
 @end
 
 
@@ -32,54 +35,76 @@
 - (void)downloadImageFromURL:(NSURL *)url withPlaceholderImage:(PVImage *)img errorImage:(PVImage *)errorImg andDisplaySpinningWheel:(BOOL)usesSpinningWheel{
     [self cancelDownload];
     
-    self.isLoadingImage = YES;
-    self.didFailLoadingImage = NO;
-    self.userDidCancel = NO;
-    
-    self.image = img;
-    errorImage = errorImg;
-    imageDownloadData = [NSMutableData data];
+	self.url = url;
 	
-	NSURLConnection *conn = [[NSURLConnection alloc] initWithRequest:[NSURLRequest requestWithURL:url] delegate:self];
-    imageURLConnection = conn;
-    
-    if(usesSpinningWheel){
+	void (^completion)(PVImage *image) = ^(PVImage *image) {
 		
-#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
-		spinningWheel = [[NSProgressIndicator alloc] init];
-		[spinningWheel setStyle:NSProgressIndicatorSpinningStyle];
-		[spinningWheel setDisplayedWhenStopped:NO];
+		dispatch_async(dispatch_get_main_queue(), ^{
 
-		[self addSubview:spinningWheel];
-
-		[spinningWheel startAnimation:self];
-
-#else
-		spinningWheel = [[UIProgressIndicaor alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray]
-		[spinningWheel setHidesWhenStopped:YES];
-		
-		[self addSubview:spinningWheel];
-
-		[spinningWheel startAnimating];
-
-#endif
-		
-        //If the NSImageView size is 64+ height and 64+ width display Spinning Wheel 32x32
-        if (self.frame.size.height >= 64 && self.frame.size.width >= 64){
+			if( image ) {
+				self.image = image;
+				return;
+			}
 			
-            [spinningWheel setFrame: NSMakeRect(self.frame.size.width * 0.5 - 16, self.frame.size.height * 0.5 - 16, 32, 32)];
-			[spinningWheel setControlSize:NSRegularControlSize];
-
+			self.isLoadingImage = YES;
+			self.didFailLoadingImage = NO;
+			self.userDidCancel = NO;
 			
-        //If not, and size between 63 and 16 height and 63 and 16 width display Spinning Wheel 16x16
-        }else if((self.frame.size.height < 64 && self.frame.size.height >= 16) && (self.frame.size.width < 64 && self.frame.size.width >= 16)){
+			self.image = img;
+			self->errorImage = errorImg;
+			self->imageDownloadData = [NSMutableData data];
+			
+			NSURLConnection *conn = [[NSURLConnection alloc] initWithRequest:[NSURLRequest requestWithURL:url] delegate:self];
+			self->imageURLConnection = conn;
+			
+			if(usesSpinningWheel){
+				
+		#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
+				spinningWheel = [[NSProgressIndicator alloc] init];
+				[spinningWheel setStyle:NSProgressIndicatorSpinningStyle];
+				[spinningWheel setDisplayedWhenStopped:NO];
 
-			[spinningWheel setFrame: NSMakeRect(self.frame.size.width * 0.5 - 8, self.frame.size.height * 0.5 - 8, 16, 16)];
-#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
-			[spinningWheel setControlSize:NSSmallControlSize];
-#endif
-		}
-    }
+				[self addSubview:spinningWheel];
+
+				[spinningWheel startAnimation:self];
+
+		#else
+				self->spinningWheel = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
+				[self->spinningWheel setHidesWhenStopped:YES];
+				
+				[self addSubview:self->spinningWheel];
+
+				[self->spinningWheel startAnimating];
+
+		#endif
+				
+				//If the NSImageView size is 64+ height and 64+ width display Spinning Wheel 32x32
+				if (self.frame.size.height >= 64 && self.frame.size.width >= 64){
+					
+					[self->spinningWheel setFrame: NSMakeRect(self.frame.size.width * 0.5 - 16, self.frame.size.height * 0.5 - 16, 32, 32)];
+		#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
+					[spinningWheel setControlSize:NSRegularControlSize];
+		#endif
+					
+				//If not, and size between 63 and 16 height and 63 and 16 width display Spinning Wheel 16x16
+				}else if((self.frame.size.height < 64 && self.frame.size.height >= 16) && (self.frame.size.width < 64 && self.frame.size.width >= 16)){
+
+					[self->spinningWheel setFrame: NSMakeRect(self.frame.size.width * 0.5 - 8, self.frame.size.height * 0.5 - 8, 16, 16)];
+		#ifdef __MAC_OS_X_VERSION_MIN_REQUIRED
+					[spinningWheel setControlSize:NSSmallControlSize];
+		#endif
+				}
+			}
+			
+		});	// dispatch_async
+	};
+	
+	
+	if( self.checkCacheBlock ) {
+		self.checkCacheBlock( url, completion );
+	} else {
+		completion( nil );
+	}
 }
 
 - (void)cancelDownload{
@@ -126,6 +151,10 @@
     
     self.image = errorImage;
     errorImage = nil;
+	
+	if( self.didFinishBlock ) {
+		self.didFinishBlock( nil, error );
+	}
 }
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection {
@@ -148,6 +177,11 @@
         imageDownloadData = nil;
         imageURLConnection = nil;
         errorImage = nil;
+		
+		if( self.didFinishBlock ) {
+			self.didFinishBlock( data, nil );
+		}
+		
     }else{
         [self connection:nil didFailWithError:nil];
     }

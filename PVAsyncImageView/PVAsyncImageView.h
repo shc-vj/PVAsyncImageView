@@ -6,10 +6,9 @@
 //  All rights reserved.
 //
 
-#import <Cocoa/Cocoa.h>
-
 #if defined __MAC_OS_X_VERSION_MIN_REQUIRED
 // OS X
+#import <Cocoa/Cocoa.h>
 
 typedef NSImage PVImage;
 
@@ -23,8 +22,11 @@ typedef NSImage PVImage;
     NSTrackingArea *trackingArea;
 }
 
-#elif 
+#else
 // iOS version
+#import <Foundation/Foundation.h>
+
+#define NSMakeRect CGRectMake
 
 typedef UIImage PVImage;
 
@@ -33,20 +35,26 @@ typedef UIImage PVImage;
 	NSMutableData *imageDownloadData;
 	PVImage *errorImage;
 	
-	UIActivityIndicator *spinningWheel;
+	UIActivityIndicatorView *spinningWheel;
 }
 
 #endif
 
+typedef void (^PVAsyncImageViewDidFinishBlock)(NSData *downloadedData, NSError *error);
+typedef void (^PVAsyncImageViewCheckCacheBlock)(NSURL *imageUrl, void (^completion)(PVImage *image) );
 
-@property (readonly) BOOL isLoadingImage;
-@property (readonly) BOOL userDidCancel;
-@property (readonly) BOOL didFailLoadingImage;
+@property (nonatomic,strong,readonly) NSURL *url;
+@property (nonatomic,assign,readonly) BOOL isLoadingImage;
+@property (nonatomic,assign,readonly) BOOL userDidCancel;
+@property (nonatomic,assign,readonly) BOOL didFailLoadingImage;
+
+@property (nonatomic, copy) PVAsyncImageViewCheckCacheBlock checkCacheBlock;
+@property (nonatomic, copy) PVAsyncImageViewDidFinishBlock didFinishBlock;
 
 #if defined __MAC_OS_X_VERSION_MIN_REQUIRED
-@property (readwrite, retain) NSString *toolTipWhileLoading;
-@property (readwrite, retain) NSString *toolTipWhenFinished;
-@property (readwrite, retain) NSString *toolTipWhenFinishedWithError;
+@property (nonatomic,readwrite, strong) NSString *toolTipWhileLoading;
+@property (nonatomic,readwrite, strong) NSString *toolTipWhenFinished;
+@property (nonatomic,readwrite, strong) NSString *toolTipWhenFinishedWithError;
 #endif
 
 //Loads an image from the web
